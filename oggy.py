@@ -5,8 +5,10 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 import re
 
-BOT_TOKEN  = "8735897869:AAHQilmIbYG6TYbCdchapc1lnkkQzGJ7Tqk"
-CHANNEL_ID = -1003325805849
+# ── Railway will provide these from environment variables ──
+BOT_TOKEN  = os.environ.get("BOT_TOKEN", "8735897869:AAHQilmIbYG6TYbCdchapc1lnkkQzGJ7Tqk")
+CHANNEL_ID = int(os.environ.get("CHANNEL_ID", "-1003325805849"))
+# ──────────────────────────────────────────────────────────
 
 def download_instagram_video(url):
     match = re.search(r"/(reel|p)/([A-Za-z0-9_-]+)", url)
@@ -73,7 +75,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     text = message.text or ""
 
-    # Extract all instagram links — works with newline OR comma separated
     links = re.findall(r"https?://(?:www\.)?instagram\.com/(?:reel|p)/[A-Za-z0-9_-]+/?[^\s,]*", text)
 
     if not links:
@@ -87,25 +88,21 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         f"⏳ Downloading {total} video(s)..."
     )
 
-    # Download all videos simultaneously
     tasks = [download_and_send(context, url) for url in links]
     results = await asyncio.gather(*tasks)
 
     success = sum(1 for r, _ in results if r)
     failed = total - success
 
-    # Cleanup all folders
     for _, shortcode in results:
         if shortcode:
             cleanup(shortcode)
 
-    # Delete original link message
     await context.bot.delete_message(
         chat_id=CHANNEL_ID,
         message_id=message.message_id
     )
 
-    # Show final status then delete after 3 seconds
     if failed == 0:
         await context.bot.edit_message_text(
             chat_id=CHANNEL_ID,
